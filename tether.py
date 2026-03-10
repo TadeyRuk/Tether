@@ -2,39 +2,31 @@ import subprocess
 import time
 import logging
 import requests
+import configparser
+import os
 from collections import deque
 
-# ─── CONFIGURATION — update these values before running ───────────────────────
+config = configparser.ConfigParser()
+config_path = os.path.expanduser("~/.config/tether/tether.conf")
 
-# Your iPhone's Bluetooth MAC address (from `bluetoothctl devices`)
-DEVICE_MAC = "80:54:E3:CA:B2:0B"  # ← REPLACE THIS
+if not os.path.exists(config_path):
+    raise FileNotFoundError(
+        f"Config file not found at {config_path}.\n"
+        "Copy tether.conf.example to ~/.config/tether/tether.conf "
+        "and fill in your values before running Tether."
+    )
 
-# RSSI thresholds in dBm — more negative means weaker/farther signal.
-# LOCK_THRESHOLD:   if average RSSI drops below this, you've left → lock.
-# UNLOCK_THRESHOLD: if average RSSI rises above this, you're back → notify.
-# The gap between them is your hysteresis buffer — prevents flapping.
-LOCK_THRESHOLD   = -80
-UNLOCK_THRESHOLD = -65
+config.read(config_path)
 
-# Value used when the device simply isn't detected at all
-MISSING_RSSI = -100
-
-# How many readings to average — higher means slower but more stable decisions
-RSSI_WINDOW = 5
-
-# Seconds between each poll — every 5 seconds is a good balance
-POLL_INTERVAL = 5
-
-# Your ntfy topic
-NTFY_TOPIC = "rukkan_paw_unlock_theLinux_120604"
-
-# Your secret token (must match SECRET_TOKEN in unlock_server.py)
-SECRET_TOKEN = "Rukkan_Folded_Paw"  # ← REPLACE THIS
-
-# Your laptop's full Tailscale HTTPS address
-LAPTOP_URL = "https://tadey-asus-tuf-gaming-a15-fa507nu-fa507nu.tailb4de09.ts.net:8080"
-
-# ──────────────────────────────────────────────────────────────────────────────
+DEVICE_MAC       = config.get("tether", "device_mac")
+SECRET_TOKEN     = config.get("tether", "secret_token")
+NTFY_TOPIC       = config.get("tether", "ntfy_topic")
+LAPTOP_URL       = f"https://{config.get('tether', 'tailscale_hostname')}:8080"
+LOCK_THRESHOLD   = config.getint("tether", "lock_threshold",   fallback=-80)
+UNLOCK_THRESHOLD = config.getint("tether", "unlock_threshold", fallback=-65)
+POLL_INTERVAL    = config.getint("tether", "poll_interval",    fallback=5)
+MISSING_RSSI     = -100
+RSSI_WINDOW      = 5
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,38 +36,18 @@ log = logging.getLogger(__name__)
 
 
 def get_rssi(mac):
-    """
-    Determine if the device is nearby using two approaches.
-    
-    Primary: l2ping — sends a Bluetooth ping and waits for a response.
-             Returns a strong synthetic RSSI (-50) if reachable,
-             or MISSING_RSSI if unreachable. This is the most reliable
-             method for iPhones which don't continuously broadcast RSSI.
-    
-    Fallback: bluetoothctl info — checks for actual RSSI data in case
-              the device is connected and broadcasting signal strength.
-    """
-    # Method 1: l2ping reachability check
-    # -c 1 means send 1 ping, -t 3 means wait 3 seconds for a response
-    # We run as the current user — note: l2ping may need sudo on some systems
     try:
         result = subprocess.run(
             ["sudo", "l2ping", "-c", "1", "-t", "3", mac],
             capture_output=True, text=True, timeout=6
         )
         if result.returncode == 0:
-            # Device responded to ping — it's definitely nearby
-            # We return a synthetic "strong signal" value
-            log.debug(f"l2ping: {mac} is reachable")
             return -50
         else:
-            # Device didn't respond — it's out of range or powered off
-            log.debug(f"l2ping: {mac} is unreachable")
             return MISSING_RSSI
     except Exception as e:
         log.debug(f"l2ping failed: {e}")
 
-    # Method 2: bluetoothctl RSSI fallback
     try:
         result = subprocess.run(
             ["bluetoothctl", "info", mac],
@@ -84,33 +56,26 @@ def get_rssi(mac):
         for line in result.stdout.splitlines():
             if "RSSI" in line:
                 value = int(line.split(":")[-1].strip())
-                if value != 0:  # ignore spurious zero readings
+                if value != 0:
                     return value
     except Exception:
         pass
 
     return MISSING_RSSI
 
+
 def lock_screen():
-    """Lock the screen using systemd-logind."""
-    log.info("🔒 Locking screen — you've left the area.")
+    log.info("Locking screen - you have left the area.")
     subprocess.run(["loginctl", "lock-session"])
 
 
 def send_ntfy_notification():
-    """
-    Push a notification to the iPhone via ntfy.
-    The Actions header embeds the unlock button directly in the notification
-    so the user can unlock without opening any app.
-    """
-    log.info("📱 Sending unlock notification to iPhone...")
+    log.info("Sending unlock notification to iPhone...")
     try:
         requests.post(
             f"https://ntfy.sh/{NTFY_TOPIC}",
             headers={
-                # Encode header values as UTF-8 bytes to support emojis
-                # latin-1 (requests default) can't handle emoji characters
-                "Title": "You're home, Tadey!".encode("utf-8"),
+                "Title": "You're home!".encode("utf-8"),
                 "Priority": "high",
                 "Tags": "key,tada",
                 "Actions": f"view, Unlock Laptop, {LAPTOP_URL}/unlock?token={SECRET_TOKEN}",
@@ -118,20 +83,17 @@ def send_ntfy_notification():
             data="Your laptop detected you nearby. Tap to unlock.".encode("utf-8"),
             timeout=10
         )
-        log.info("✅ Notification sent successfully.")
+        log.info("Notification sent successfully.")
     except requests.RequestException as e:
         log.warning(f"Failed to send ntfy notification: {e}")
 
-def main():
-    log.info("═══════════════════════════════════════════════")
-    log.info("   Bluetooth Proximity Watcher started")
-    log.info(f"   Watching device: {DEVICE_MAC}")
-    log.info(f"   Lock threshold:   {LOCK_THRESHOLD} dBm")
-    log.info(f"   Unlock threshold: {UNLOCK_THRESHOLD} dBm")
-    log.info("═══════════════════════════════════════════════")
 
-    # A deque is a list with a maximum size — old readings automatically
-    # fall off the left end as new ones are added to the right.
+def main():
+    log.info("Bluetooth Proximity Watcher started")
+    log.info(f"Watching device: {DEVICE_MAC}")
+    log.info(f"Lock threshold:   {LOCK_THRESHOLD} dBm")
+    log.info(f"Unlock threshold: {UNLOCK_THRESHOLD} dBm")
+
     rssi_window = deque(maxlen=RSSI_WINDOW)
     is_locked = False
 
@@ -139,8 +101,6 @@ def main():
         rssi = get_rssi(DEVICE_MAC)
         rssi_window.append(rssi)
 
-        # Wait until the window is full before making any decisions
-        # so we're always averaging a full set of readings
         if len(rssi_window) < RSSI_WINDOW:
             log.info(f"Warming up... ({len(rssi_window)}/{RSSI_WINDOW} readings)")
             time.sleep(POLL_INTERVAL)
@@ -150,12 +110,10 @@ def main():
         log.info(f"Avg RSSI: {avg:.1f} dBm | Raw: {rssi} dBm | Locked: {is_locked}")
 
         if not is_locked and avg < LOCK_THRESHOLD:
-            # Average signal has dropped below lock threshold — you've left
             lock_screen()
             is_locked = True
 
         elif is_locked and avg > UNLOCK_THRESHOLD:
-            # Average signal has risen above unlock threshold — you're back
             send_ntfy_notification()
             is_locked = False
 
