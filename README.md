@@ -1,7 +1,5 @@
 # Tether 🔗
 
-> *Your laptop locks when you leave. It notifies you when you return. You confirm. It unlocks. That's it.*
-
 Tether is a lightweight, privacy-first proximity lock system for Ubuntu that uses your iPhone's Bluetooth signal as an invisible tether to your laptop. Walk away and your screen locks automatically. Come back and your laptop sends a push notification to your iPhone with a one-tap unlock button. No password typing, no manual locking, no third-party surveillance. Just you and your devices, talking to each other privately through an encrypted tunnel.
 
 Built entirely with open-source tools. Runs silently as two background systemd services. All sensitive configuration lives in a file on your machine that never touches the repository.
