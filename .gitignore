@@ -1,0 +1,21 @@
+# Secrets and credentials — NEVER commit these
+tether.conf
+*.crt
+*.key
+
+# Python generated cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS artifacts
+.DS_Store
+
+# Log files
+*.log

@@ -1,0 +1,24 @@
+[tether]
+# Your iPhone's Bluetooth MAC address
+# Run `bluetoothctl devices` to find it
+device_mac = AA:BB:CC:DD:EE:FF
+
+# A secret token — treat this like a password
+# Make it random and never share it publicly
+secret_token = your-secret-token-here
+
+# Your Tailscale MagicDNS hostname
+tailscale_hostname = your-machine-name.your-tailnet.ts.net
+
+# Your ntfy topic name
+ntfy_topic = your-ntfy-topic-here
+
+# Full paths to your Tailscale TLS certificate files
+cert_file = /home/yourusername/.config/tether/your-machine-name.your-tailnet.ts.net.crt
+key_file = /home/yourusername/.config/tether/your-machine-name.your-tailnet.ts.net.key
+
+# Optional tuning values
+lock_threshold = -80
+unlock_threshold = -65
+poll_interval = 5
+server_port = 8080
