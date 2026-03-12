@@ -95,18 +95,18 @@ def _build_detail(readiness):
 
 
 SOUNDS = {
-    "critical": "/usr/share/sounds/freedesktop/stereo/dialog-error.oga",
-    "normal":   "/usr/share/sounds/freedesktop/stereo/message.oga",
-    "lock":     "/usr/share/sounds/freedesktop/stereo/screen-capture.oga",
-    "unlock":   "/usr/share/sounds/freedesktop/stereo/service-login.oga",
+    "critical": "/usr/share/sounds/freedesktop/stereo/bell.oga",
+    "normal":   "/usr/share/sounds/freedesktop/stereo/bell.oga",
+    "lock":     "/usr/share/sounds/freedesktop/stereo/bell.oga",
+    "unlock":   "/usr/share/sounds/freedesktop/stereo/bell.oga",
 }
 
 
 def _play_sound(sound_key):
-    """Play a system sound using paplay (non-blocking)."""
+    """Play a system sound using paplay at max volume (non-blocking)."""
     path = SOUNDS.get(sound_key, SOUNDS["normal"])
     try:
-        subprocess.Popen(["paplay", path])
+        subprocess.Popen(["paplay", "--volume=131072", path])
     except FileNotFoundError:
         try:
             subprocess.Popen(["aplay", path])
