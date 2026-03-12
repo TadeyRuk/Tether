@@ -46,6 +46,18 @@ def unlock():
     subprocess.run(["loginctl", "unlock-session"])
     return "unlocked", 200
 
+@app.route("/lock", methods=["GET"])
+def lock():
+    token = request.args.get("token")
+
+    if token != SECRET_TOKEN:
+        log.warning(f"Rejected lock attempt with token: {token}")
+        abort(403)
+
+    log.info("Correct token received - locking screen...")
+    subprocess.run(["loginctl", "lock-session"])
+    return "locked", 200
+
 
 @app.route("/status", methods=["GET"])
 def status():

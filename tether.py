@@ -5,6 +5,7 @@ import requests
 import configparser
 import os
 from collections import deque
+import tether_notify
 
 config = configparser.ConfigParser()
 config_path = os.path.expanduser("~/.config/tether/tether.conf")
@@ -94,6 +95,8 @@ def main():
     log.info(f"Lock threshold:   {LOCK_THRESHOLD} dBm")
     log.info(f"Unlock threshold: {UNLOCK_THRESHOLD} dBm")
 
+    tether_notify.notify_startup(DEVICE_MAC)
+
     rssi_window = deque(maxlen=RSSI_WINDOW)
     is_locked = False
 
@@ -111,10 +114,12 @@ def main():
 
         if not is_locked and avg < LOCK_THRESHOLD:
             lock_screen()
+            tether_notify.notify_lock(DEVICE_MAC)
             is_locked = True
 
         elif is_locked and avg > UNLOCK_THRESHOLD:
             send_ntfy_notification()
+            tether_notify.notify_unlock(DEVICE_MAC)
             is_locked = False
 
         time.sleep(POLL_INTERVAL)
