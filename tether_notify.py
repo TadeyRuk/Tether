@@ -101,12 +101,15 @@ SOUNDS = {
     "unlock":   "/usr/share/sounds/freedesktop/stereo/bell.oga",
 }
 
+# paplay volume scale: 65536 = 100%. Lower this to make Tether quieter.
+SOUND_VOLUME = 32768  # 50%
+
 
 def _play_sound(sound_key):
-    """Play a system sound using paplay at max volume (non-blocking)."""
+    """Play a system sound using paplay (non-blocking)."""
     path = SOUNDS.get(sound_key, SOUNDS["normal"])
     try:
-        subprocess.Popen(["paplay", "--volume=131072", path])
+        subprocess.Popen(["paplay", f"--volume={SOUND_VOLUME}", path])
     except FileNotFoundError:
         try:
             subprocess.Popen(["aplay", path])
