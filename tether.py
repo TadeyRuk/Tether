@@ -4,6 +4,8 @@ import logging
 import requests
 import configparser
 import os
+import socket
+import errno
 from collections import deque
 import tether_notify
 
@@ -28,6 +30,8 @@ UNLOCK_THRESHOLD = config.getint("tether", "unlock_threshold", fallback=-65)
 POLL_INTERVAL    = config.getint("tether", "poll_interval",    fallback=5)
 MISSING_RSSI     = -100
 RSSI_WINDOW      = 5
+PROBE_PSM        = 1     # L2CAP SDP channel — reachable on any paired device
+PROBE_TIMEOUT    = 4     # seconds to wait for the device to answer the page
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,18 +41,26 @@ log = logging.getLogger(__name__)
 
 
 def get_rssi(mac):
+    # Active reachability probe via an L2CAP connection attempt. This replaces
+    # the old `sudo l2ping`, which BlueZ has removed from modern distros (e.g.
+    # Fedora). Like l2ping, the connect pages the device, so it works whether or
+    # not there is an active connection — and needs no root. A successful connect
+    # (or an active refusal) means the phone answered and is in range; a timeout
+    # or host-down means it is gone. Returns the same binary -50 / -100 signal
+    # the original l2ping path produced.
+    sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_SEQPACKET, socket.BTPROTO_L2CAP)
+    sock.settimeout(PROBE_TIMEOUT)
     try:
-        result = subprocess.run(
-            ["sudo", "l2ping", "-c", "1", "-t", "3", mac],
-            capture_output=True, text=True, timeout=6
-        )
-        if result.returncode == 0:
+        sock.connect((mac, PROBE_PSM))
+        return -50
+    except OSError as e:
+        if e.errno == errno.ECONNREFUSED:
             return -50
-        else:
-            return MISSING_RSSI
-    except Exception as e:
-        log.debug(f"l2ping failed: {e}")
+        log.debug(f"l2cap probe failed: {e}")
+    finally:
+        sock.close()
 
+    # Fallback: if the phone is actively connected, read its real RSSI.
     try:
         result = subprocess.run(
             ["bluetoothctl", "info", mac],
@@ -56,7 +68,7 @@ def get_rssi(mac):
         )
         for line in result.stdout.splitlines():
             if "RSSI" in line:
-                value = int(line.split(":")[-1].strip())
+                value = int(line.split("(")[-1].rstrip(") ").strip())
                 if value != 0:
                     return value
     except Exception:
