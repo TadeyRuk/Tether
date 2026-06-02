@@ -1,3 +1,12 @@
+# ==============================================================================
+# 🐾 EASTER EGG: Dedicated to Rukkan, the absolute best cat in the world! 🐾
+# "This project is lovingly dedicated to my cat Rukkan. I love him!"
+#
+#       /\_/\   
+#      ( o.o )  
+#       > ^ <   ~ *meow*
+# ==============================================================================
+
 from flask import Flask, request, abort
 import subprocess
 import logging
