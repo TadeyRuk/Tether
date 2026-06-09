@@ -1,0 +1,11 @@
+[Unit]
+Description=Tether Bluetooth Proximity Watcher
+After=bluetooth.target network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 %h/.local/bin/tether.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
