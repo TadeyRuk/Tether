@@ -170,6 +170,24 @@ def notify_startup(device_mac):
     return readiness
 
 
+def notify_pending_lock(device_mac, grace_seconds):
+    """Warn that the grace period has started; action notification runs separately."""
+    if grace_seconds > 0:
+        notify(
+            "Tether — Phone out of range",
+            f"Screen will lock in {grace_seconds}s. Tap Cancel to stay unlocked.",
+            urgency="critical",
+            sound_key="lock",
+        )
+    else:
+        notify(
+            "Tether — Phone out of range",
+            "Locking screen now.",
+            urgency="critical",
+            sound_key="lock",
+        )
+
+
 def notify_lock(device_mac):
     """Send a notification when the screen is locked."""
     readiness = run_readiness_checks(device_mac)
