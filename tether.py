@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 import logging
+import threading
 import requests
 import configparser
 import os
@@ -35,9 +36,10 @@ DEVICE_MAC       = config.get("tether", "device_mac")
 SECRET_TOKEN     = config.get("tether", "secret_token")
 NTFY_TOPIC       = config.get("tether", "ntfy_topic")
 LAPTOP_URL       = f"https://{config.get('tether', 'tailscale_hostname')}:8080"
-LOCK_THRESHOLD   = config.getint("tether", "lock_threshold",   fallback=-80)
-UNLOCK_THRESHOLD = config.getint("tether", "unlock_threshold", fallback=-65)
-POLL_INTERVAL    = config.getint("tether", "poll_interval",    fallback=5)
+LOCK_THRESHOLD    = config.getint("tether", "lock_threshold",    fallback=-80)
+UNLOCK_THRESHOLD  = config.getint("tether", "unlock_threshold", fallback=-65)
+POLL_INTERVAL     = config.getint("tether", "poll_interval",    fallback=5)
+LOCK_GRACE_PERIOD = config.getint("tether", "lock_grace_period", fallback=20)
 MISSING_RSSI     = -100
 RSSI_WINDOW      = 5
 PROBE_PSM        = 1     # L2CAP SDP channel — reachable on any paired device
@@ -87,6 +89,29 @@ def get_rssi(mac):
     return MISSING_RSSI
 
 
+def _grace_notification_worker(grace_seconds, cancel_event):
+    """Background thread: show action notification; set cancel_event if user cancels."""
+    try:
+        result = subprocess.run(
+            [
+                "notify-send",
+                "--action=cancel:Cancel",
+                f"--expire-time={grace_seconds * 1000}",
+                "--urgency=critical",
+                "--app-name=Tether",
+                "Tether — Phone out of range",
+                f"Locking in {grace_seconds}s. Tap Cancel to stay unlocked.",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=grace_seconds + 5,
+        )
+        if result.stdout.strip() == "cancel":
+            cancel_event.set()
+    except Exception as e:
+        log.debug(f"Grace notification error: {e}")
+
+
 def lock_screen():
     log.info("Locking screen - you have left the area.")
     subprocess.run(["loginctl", "lock-session"])
@@ -130,6 +155,8 @@ def main():
 
     rssi_window = deque(maxlen=RSSI_WINDOW)
     is_locked = False
+    pending_lock_since = None
+    cancel_lock_event = threading.Event()
 
     while True:
         rssi = get_rssi(DEVICE_MAC)
@@ -141,14 +168,44 @@ def main():
             continue
 
         avg = sum(rssi_window) / len(rssi_window)
-        log.info(f"Avg RSSI: {avg:.1f} dBm | Raw: {rssi} dBm | Locked: {is_locked}")
+        log.info(
+            f"Avg RSSI: {avg:.1f} dBm | Raw: {rssi} dBm | "
+            f"Locked: {is_locked} | Pending: {pending_lock_since is not None}"
+        )
 
-        if not is_locked and avg < LOCK_THRESHOLD:
-            lock_screen()
-            tether_notify.notify_lock(DEVICE_MAC)
-            is_locked = True
+        if not is_locked:
+            if avg < LOCK_THRESHOLD:
+                if pending_lock_since is None:
+                    # Enter grace period — ask the user before locking.
+                    pending_lock_since = time.time()
+                    cancel_lock_event.clear()
+                    if LOCK_GRACE_PERIOD > 0:
+                        log.info(f"Phone out of range — grace period started ({LOCK_GRACE_PERIOD}s)")
+                        t = threading.Thread(
+                            target=_grace_notification_worker,
+                            args=(LOCK_GRACE_PERIOD, cancel_lock_event),
+                            daemon=True,
+                        )
+                        t.start()
+                    tether_notify.notify_pending_lock(DEVICE_MAC, LOCK_GRACE_PERIOD)
+                else:
+                    elapsed = time.time() - pending_lock_since
+                    if LOCK_GRACE_PERIOD <= 0 or elapsed >= LOCK_GRACE_PERIOD:
+                        if cancel_lock_event.is_set():
+                            log.info("Lock cancelled by user during grace period.")
+                        else:
+                            lock_screen()
+                            tether_notify.notify_lock(DEVICE_MAC)
+                            is_locked = True
+                        pending_lock_since = None
+            else:
+                if pending_lock_since is not None:
+                    # Phone came back in range during grace — cancel silently.
+                    log.info("Phone back in range — pending lock cancelled.")
+                    cancel_lock_event.set()
+                    pending_lock_since = None
 
-        elif is_locked and avg > UNLOCK_THRESHOLD:
+        elif avg > UNLOCK_THRESHOLD:
             send_ntfy_notification()
             tether_notify.notify_unlock(DEVICE_MAC)
             is_locked = False

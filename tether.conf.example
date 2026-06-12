@@ -22,3 +22,7 @@ lock_threshold = -80
 unlock_threshold = -65
 poll_interval = 5
 server_port = 8080
+# Seconds to wait before locking after phone goes out of range.
+# A desktop notification with a Cancel button appears during this window.
+# Set to 0 to disable the grace period and lock immediately.
+lock_grace_period = 20
