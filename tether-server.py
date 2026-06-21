@@ -105,6 +105,44 @@ def status():
     return "Tether is running", 200
 
 
+@app.route("/rukkan", methods=["GET"])
+def rukkan():
+    return (
+        """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐾 Rukkan 🐾</title>
+<style>
+  body { background:#1a1a2e; color:#e0e0e0; font-family:monospace;
+         display:flex; flex-direction:column; align-items:center;
+         justify-content:center; min-height:100vh; margin:0; }
+  pre  { color:#f0a500; font-size:1.2rem; line-height:1.4; }
+  h1   { color:#f0a500; font-size:2rem; margin-bottom:0.2em; }
+  p    { color:#aaa; font-size:1rem; margin:0.3em 0; }
+  .heart { color:#e05c97; }
+</style>
+</head>
+<body>
+<h1>🐾 Rukkan 🐾</h1>
+<pre>
+    /\\_/\\
+   ( o.o )
+    > ^ <
+   /|   |\\
+  (_|   |_)
+</pre>
+<p>This project is lovingly dedicated to</p>
+<p><strong>Rukkan</strong> — the absolute best cat in the world.</p>
+<p class="heart">❤️ I love him! ❤️</p>
+</body>
+</html>""",
+        200,
+        {"Content-Type": "text/html"},
+    )
+
+
 if __name__ == "__main__":
     log.info("Tether unlock server starting...")
     app.run(

@@ -138,12 +138,20 @@ def send_ntfy_notification():
 
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--rukkan":
-        print("\n🐾 Rukkan Mode Activated! 🐾")
-        print("Dedicated to Rukkan, the most wonderful cat in the universe.")
-        print("May your lines of code be as soft and comforting as his purrs. ❤️")
-        print("\n       /\\_/\\  ")
-        print("      ( o.o ) ")
-        print("       > ^ <  ~ Purrrrrrr!\n")
+        print("\n" + "=" * 50)
+        print("  🐾  R U K K A N   M O D E   🐾")
+        print("=" * 50)
+        print("""
+      /\\_/\\
+     ( o.o )   ~ Purrrrrrr ~
+      > ^ <
+     /|   |\\
+    (_|   |_)
+""")
+        print("  Dedicated to Rukkan,")
+        print("  the absolute best cat in the world.")
+        print("\n  ❤️  I love him! ❤️")
+        print("\n" + "=" * 50 + "\n")
         return
 
     log.info("Bluetooth Proximity Watcher started")
