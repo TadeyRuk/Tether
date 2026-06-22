@@ -108,9 +108,11 @@ SOUNDS = {
     "normal":   "/usr/share/sounds/freedesktop/stereo/bell.oga",
     "lock":     "/usr/share/sounds/freedesktop/stereo/bell.oga",
     "unlock":   "/usr/share/sounds/freedesktop/stereo/bell.oga",
+    # "purr":   "<unavailable>"  — Rukkan does not share his purring with machines.
 }
 
 # paplay volume scale: 65536 = 100%. Lower this to make Tether quieter.
+# Rukkan prefers silence. He does not negotiate.
 SOUND_VOLUME = 32768  # 50%
 
 
