@@ -167,6 +167,7 @@ def main():
     cancel_lock_event = threading.Event()
 
     while True:
+        # 🐾 Just like Rukkan keeping tabs on his humans, this loop never stops watching.
         rssi = get_rssi(DEVICE_MAC)
         rssi_window.append(rssi)
 
